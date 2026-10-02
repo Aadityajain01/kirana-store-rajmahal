@@ -1,0 +1,299 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Shop {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  ownerUserId String   @db.ObjectId
+  mobile      String
+  address     String?
+  currency    String   @default("INR")
+  timezone    String   @default("Asia/Kolkata")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members            ShopMember[]
+  customers          Customer[]
+  suppliers          Supplier[]
+  accounts           Account[]
+  transactions       Transaction[]
+  transactionEntries TransactionEntry[]
+  expenses           Expense[]
+  expenseCategories  ExpenseCategory[]
+  dailyClosings      DailyClosing[]
+  auditLogs          AuditLog[]
+  devices            Device[]
+  syncCommands       SyncCommand[]
+  products           Product[]
+  transactionItems   TransactionItem[]
+
+  @@map("shops")
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  mobile    String   @unique
+  name      String
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships ShopMember[]
+  devices     Device[]
+  auditLogs   AuditLog[]
+
+  @@map("users")
+}
+
+model ShopMember {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  shopId String @db.ObjectId
+  userId String @db.ObjectId
+  role   String @default("OWNER") // OWNER, EMPLOYEE, ACCOUNTANT
+  status String @default("ACTIVE")
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, userId])
+  @@map("shop_members")
+}
+
+model Customer {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  shopId      String   @db.ObjectId
+  name        String
+  mobile      String?
+  address     String?
+  creditLimit BigInt   @default(0) // paise
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, name])
+  @@index([shopId, mobile])
+  @@map("customers")
+}
+
+model Supplier {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  shopId    String   @db.ObjectId
+  name      String
+  mobile    String?
+  address   String?
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@index([shopId, name])
+  @@map("suppliers")
+}
+
+model Account {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  shopId String @db.ObjectId
+  code   String // CASH, BANK, RECEIVABLE, PAYABLE, SALES, EXPENSE, OPENING_BALANCE_EQUITY
+  name   String
+  type   String // ASSET, LIABILITY, EQUITY, INCOME, EXPENSE
+  status String @default("ACTIVE")
+
+  shop    Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  entries TransactionEntry[]
+
+  @@unique([shopId, code])
+  @@map("accounts")
+}
+
+model Transaction {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  shopId          String    @db.ObjectId
+  type            String // SALE_CASH, SALE_CREDIT, PURCHASE_CASH, PURCHASE_CREDIT, CUSTOMER_PAYMENT, SUPPLIER_PAYMENT, EXPENSE, CASH_IN, CASH_OUT, SALE_RETURN, PURCHASE_RETURN, OPENING_BALANCE, ADJUSTMENT
+  partyType       String    @default("NONE") // CUSTOMER, SUPPLIER, NONE
+  partyId         String?
+  amount          BigInt // positive paise
+  paymentMode     String? // CASH, UPI, BANK, CARD, OTHER
+  transactionDate DateTime  @default(now())
+  note            String?
+  referenceNo     String?
+  billNo          String?
+  deviceId        String?
+  idempotencyKey  String?
+  version         Int       @default(1)
+  status          String    @default("POSTED") // DRAFT, POSTED, REVERSED, SOFT_DELETED
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  shop    Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  entries TransactionEntry[]
+  items   TransactionItem[]
+  expense Expense?
+
+  @@index([shopId, transactionDate])
+  @@index([shopId, partyType, partyId])
+  @@index([shopId, idempotencyKey])
+  @@map("transactions")
+}
+
+model TransactionEntry {
+  id            String @id @default(auto()) @map("_id") @db.ObjectId
+  shopId        String @db.ObjectId
+  transactionId String @db.ObjectId
+  accountId     String @db.ObjectId
+  debit         BigInt @default(0) // paise
+  credit        BigInt @default(0) // paise
+
+  shop        Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  account     Account     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([shopId, transactionId])
+  @@index([shopId, accountId])
+  @@map("transaction_entries")
+}
+
+model Expense {
+  id            String @id @default(auto()) @map("_id") @db.ObjectId
+  shopId        String @db.ObjectId
+  transactionId String @unique @db.ObjectId
+  categoryId    String @db.ObjectId
+
+  shop        Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  transaction Transaction     @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@map("expenses")
+}
+
+model ExpenseCategory {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  shopId    String @db.ObjectId
+  name      String
+  status    String @default("ACTIVE")
+  sortOrder Int    @default(0)
+
+  shop     Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  expenses Expense[]
+
+  @@unique([shopId, name])
+  @@map("expense_categories")
+}
+
+model DailyClosing {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  shopId       String    @db.ObjectId
+  tradingDate  String // YYYY-MM-DD
+  openingCash  BigInt    @default(0)
+  expectedCash BigInt    @default(0)
+  actualCash   BigInt    @default(0)
+  difference   BigInt    @default(0)
+  closedBy     String
+  closedAt     DateTime  @default(now())
+  isReopened   Boolean   @default(false)
+  reopenedBy   String?
+  reopenedAt   DateTime?
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, tradingDate])
+  @@map("daily_closings")
+}
+
+model AuditLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  shopId      String   @db.ObjectId
+  actorUserId String   @db.ObjectId
+  entityType  String
+  entityId    String
+  action      String // CREATE, UPDATE, SOFT_DELETE, REVERSE, REOPEN
+  beforeJson  String?
+  afterJson   String?
+  createdAt   DateTime @default(now())
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([shopId, entityType, entityId])
+  @@map("audit_logs")
+}
+
+model Device {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  shopId     String    @db.ObjectId
+  userId     String    @db.ObjectId
+  deviceKey  String
+  label      String
+  lastSeenAt DateTime  @default(now())
+  lastSyncAt DateTime?
+  status     String    @default("ACTIVE")
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, deviceKey])
+  @@map("devices")
+}
+
+model SyncCommand {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  shopId         String    @db.ObjectId
+  deviceId       String
+  idempotencyKey String
+  commandType    String
+  payloadJson    String
+  status         String    @default("LOCAL_PENDING") // LOCAL_PENDING, SYNCED, SYNC_FAILED, CONFLICT
+  errorCode      String?
+  createdAt      DateTime  @default(now())
+  processedAt    DateTime?
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, idempotencyKey])
+  @@map("sync_commands")
+}
+
+model Product {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  shopId    String   @db.ObjectId
+  name      String
+  unitType  String   @default("KG") // KG, PCS, LTR, PKT, DOZEN, MANUAL
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shop  Shop              @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  items TransactionItem[]
+
+  @@unique([shopId, name])
+  @@index([shopId, status])
+  @@map("products")
+}
+
+model TransactionItem {
+  id            String  @id @default(auto()) @map("_id") @db.ObjectId
+  shopId        String  @db.ObjectId
+  transactionId String  @db.ObjectId
+  productId     String? @db.ObjectId
+  productName   String
+  quantity      Float   @default(1)
+  unit          String  @default("KG") // KG, PCS, LTR, PKT, DOZEN, MANUAL
+  pricePerUnit  BigInt  @default(0) // paise per unit
+  totalPrice    BigInt  @default(0) // paise (quantity × pricePerUnit)
+
+  shop        Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  product     Product?    @relation(fields: [productId], references: [id])
+
+  @@index([shopId, transactionId])
+  @@map("transaction_items")
+}

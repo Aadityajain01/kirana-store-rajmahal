@@ -1,0 +1,56 @@
+# Dependencies
+/node_modules
+/.pnpm-store
+.pnpm-debug.log*
+
+# Next.js Build Output
+/.next/
+/out/
+.next
+
+# Production
+/build
+/dist
+
+# Environment variables & secrets (keep .env.example committed)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+!.env.example
+
+# User-specified exclusions
+scripts/
+docs/
+Rural_Kirana_Accounts_Production_Spec.docx
+spec_extracted.txt
+
+# Database & local backups
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+prisma/dev.db
+prisma/schema.sqlite.backup
+
+# TypeScript
+*.tsbuildinfo
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS & Editor files
+.DS_Store
+*.pem
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*.env
+# Vercel deployment metadata
+.vercel
