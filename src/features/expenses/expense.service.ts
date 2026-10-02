@@ -5,8 +5,9 @@ import { findExpenseCategories, findExpenseCategoryById } from './expense.reposi
 import { CreateExpenseInput } from './expense.schema';
 import { Money } from '@/lib/money';
 import { AppError } from '@/lib/errors/app-error';
+import type { ExpenseCategory } from '@prisma/client';
 
-export async function getCategories(shopId: string) {
+export async function getCategories(shopId: string): Promise<ExpenseCategory[]> {
   return findExpenseCategories(shopId);
 }
 

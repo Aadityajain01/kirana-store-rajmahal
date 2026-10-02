@@ -1,7 +1,7 @@
 import React from 'react';
 import { requireAuthSession } from '@/lib/auth/session';
-import { getCustomers } from '@/features/khata/customers/customer.service';
-import { getSuppliers } from '@/features/khata/suppliers/supplier.service';
+import { getCustomers, CustomerWithBalance } from '@/features/khata/customers/customer.service';
+import { getSuppliers, SupplierWithBalance } from '@/features/khata/suppliers/supplier.service';
 import { getCategories } from '@/features/expenses/expense.service';
 import { TransactionComposer } from '@/features/transactions/ui/TransactionComposer';
 
@@ -16,19 +16,19 @@ export default async function NewTransactionPage() {
 
   return (
     <TransactionComposer
-      customers={customers.map((c) => ({
+      customers={customers.map((c: CustomerWithBalance) => ({
         id: c.id,
         name: c.name,
         mobile: c.mobile,
         balanceMinor: c.balanceMinor,
       }))}
-      suppliers={suppliers.map((s) => ({
+      suppliers={suppliers.map((s: SupplierWithBalance) => ({
         id: s.id,
         name: s.name,
         mobile: s.mobile,
         balanceMinor: s.balanceMinor,
       }))}
-      expenseCategories={categories.map((cat) => ({
+      expenseCategories={categories.map((cat: { id: string; name: string }) => ({
         id: cat.id,
         name: cat.name,
       }))}
